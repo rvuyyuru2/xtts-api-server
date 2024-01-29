@@ -17,6 +17,7 @@ If you are looking for an option for normal XTTS use look here [https://github.c
 You can keep track of all changes on the [release page](https://github.com/daswer123/xtts-api-server/releases)
 
 ## TODO
+
 - [x] Make it possible to change generation parameters through the generation request and through a different endpoint
 
 ## Installation
@@ -32,6 +33,7 @@ This will install all the necessary dependencies, including a **CPU support only
 I recommend that you install the **GPU version** to improve processing speed ( up to 3 times faster )
 
 ### Windows
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
@@ -40,6 +42,7 @@ pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://downl
 ```
 
 ### Linux
+
 ```bash
 python -m venv venv
 source venv\bin\activate
@@ -48,9 +51,10 @@ pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://downl
 ```
 
 ### Manual
+
 ```bash
 # Clone REPO
-git clone https://github.com/daswer123/xtts-api-server
+git clone https://github.com/rvuyyuru2/xtts-api-server
 cd xtts-api-server
 # Create virtual env
 python -m venv venv
@@ -60,7 +64,7 @@ pip install -r requirements.txt
 pip install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118
 # Launch server
 python -m xtts_api_server
- 
+
 ```
 
 # Use Docker image with Docker Compose
@@ -134,7 +138,7 @@ Model-source defines in which format you want to use xtts:
 2. `apiManual` - loads version 2.0.2 by default, but you can specify the version via the -v flag, model saves into the models folder and uses the `tts_to_file` function from the TTS api
 3. `api` - will load the latest version of the model. The -v flag won't work.
 
-All versions of the XTTSv2 model can be found [here](https://huggingface.co/coqui/XTTS-v2/tree/main)  the model version name is the same as the branch name [v2.0.2,v2.0.3, main] etc.
+All versions of the XTTSv2 model can be found [here](https://huggingface.co/coqui/XTTS-v2/tree/main) the model version name is the same as the branch name [v2.0.2,v2.0.3, main] etc.
 
 The first time you run or generate, you may need to confirm that you agree to use XTTS.
 
