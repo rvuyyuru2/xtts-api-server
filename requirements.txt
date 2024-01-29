@@ -16,6 +16,6 @@ TTS @ git+https://github.com/coqui-ai/TTS@fa28f99f1508b5b5366539b2149963edcb80ba
 transformers==4.36.2
 python-multipart==0.0.6
 typing-extensions>=4.8.0
-numpy==1.24.3
-mecab-python3==1.0.6
-unidic==1.1.0
+numpy
+mecab-python3
+unidic
