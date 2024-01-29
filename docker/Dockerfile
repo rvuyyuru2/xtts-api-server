@@ -2,7 +2,7 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 # Set label for the docker image description
-LABEL description="Docker image for xtts-api-server"
+LABEL description="Docker image for xtts-api-server_v1"
 
 # Install required packages (avoid cache to reduce image size)
 RUN apt-get update && \
