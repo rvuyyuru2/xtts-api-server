@@ -56,6 +56,7 @@ if(DEEPSPEED):
 
 # Create an instance of the TTSWrapper class and server
 app = FastAPI()
+print("started")
 XTTS = TTSWrapper(OUTPUT_FOLDER,SPEAKER_FOLDER,MODEL_FOLDER,LOWVRAM_MODE,MODEL_SOURCE,MODEL_VERSION,DEVICE,DEEPSPEED,USE_CACHE)
 
 # Check for old format model version
