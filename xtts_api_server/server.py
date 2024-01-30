@@ -41,7 +41,7 @@ MODEL_FOLDER = os.getenv('MODEL', 'models')
 BASE_HOST = os.getenv('BASE_URL', '127.0.0.1:8080')
 BASE_URL = os.getenv('BASE_URL', '127.0.0.1:8080')
 MODEL_SOURCE = os.getenv("MODEL_SOURCE", "local")
-MODEL_VERSION = os.getenv("MODEL_VERSION","v2.0.2")
+MODEL_VERSION = os.getenv("MODEL_VERSION","v2.0.3")
 LOWVRAM_MODE = os.getenv("LOWVRAM_MODE") == 'true'
 DEEPSPEED = os.getenv("DEEPSPEED") == 'true'
 USE_CACHE = os.getenv("USE_CACHE") == 'true'
@@ -247,7 +247,7 @@ class StreamingInputs(BaseModel):
     text: str
     language: str
     add_wav_header: bool = True
-    stream_chunk_size: str = "20"
+    stream_chunk_size: str = "40"
 
 
 def predict_streaming_generator(parsed_input: dict = Body(...)):
