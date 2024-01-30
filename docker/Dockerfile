@@ -34,4 +34,4 @@ RUN pip install xtts-api-server
 EXPOSE 8020
 
 # Run xtts_api_server when the container starts
-CMD ["bash", "-c", "python3 -m xtts_api_server --listen -p 8020 -v v2.0.3 -t 'http://localhost:8020' -sf 'xtts-server/speakers' -o 'xtts-server/output' -mf 'xtts-server/models' --deepspeed " ]
+CMD ["bash", "-c", "python3 -m xtts_api_server --listen -p 8020 -v v2.0.2 -t 'http://localhost:8020' -sf 'xtts-server/speakers' -o 'xtts-server/output' -mf 'xtts-server/models' --deepspeed " ]
