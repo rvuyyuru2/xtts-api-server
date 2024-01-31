@@ -669,6 +669,6 @@ class TTSWrapper:
             return output_file
 
         except Exception as e:
-        #     raise e  # Propagate exceptions for endpoint handling.
+            raise e  # Propagate exceptions for endpoint handling.
 
 
