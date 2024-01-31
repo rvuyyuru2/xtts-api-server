@@ -21,6 +21,9 @@ import io
 import wave
 import numpy as np
 
+from pathlib import Path
+import uuid
+
 # Class to check tts settings
 class InvalidSettingsError(Exception):
     pass
@@ -632,9 +635,7 @@ class TTSWrapper:
             raise e  # Propagate exceptions for endpoint handling.
 
 
-import os
-from pathlib import Path
-import uuid
+
 
 def determine_output_file(self, base_output_folder, extension=".wav"):
     """Generate a unique file name using UUID and ensure it doesn't already exist."""

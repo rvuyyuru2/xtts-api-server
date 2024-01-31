@@ -19,7 +19,7 @@ class CoquiEngine(BaseEngine):
 
     def __init__(self, 
                  model_name = "tts_models/multilingual/multi-dataset/xtts_v2",
-                 specific_model = "2.0.2",
+                 specific_model = "2.0.3",
                  local_models_path = None, # specify a global model path here (otherwise it will create a directory "models" in the script directory)
                  voices_path = None,
                  cloning_reference_wav: Union[str, List[str]] = "",
@@ -34,10 +34,10 @@ class CoquiEngine(BaseEngine):
                  top_k = 50,
                  top_p = 0.85,
                  enable_text_splitting = True,
-                 full_sentences = False,
+                 full_sentences = True,
                  level=logging.WARNING,
                  use_mps = False,
-                 use_deepspeed = False,
+                 use_deepspeed = True,
                  prepare_text_for_synthesis_callback = None,
                  ):
         """

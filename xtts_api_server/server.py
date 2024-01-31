@@ -8,9 +8,7 @@ import uvicorn
 from typing import AsyncGenerator, Optional
 
 import os
-import time
 from pathlib import Path
-import shutil
 from loguru import logger
 from argparse import ArgumentParser
 from pathlib import Path
@@ -306,93 +304,93 @@ async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Q
 
 #     return StreamingResponse(generator(), media_type='audio/x-wav')
 
-@app.post("/tts_to_audio/")
-async def tts_to_audio(request: SynthesisRequest):
-    if STREAM_MODE or STREAM_MODE_IMPROVE:
-        try:
-            global stream
-            # Validate language code against supported languages.
-            if request.language.lower() not in supported_languages:
-                raise HTTPException(status_code=400,
-                                    detail="Language code sent is either unsupported or misspelled.")
+# @app.post("/tts_to_audio/")
+# async def tts_to_audio(request: SynthesisRequest):
+#     if STREAM_MODE or STREAM_MODE_IMPROVE:
+#         try:
+#             global stream
+#             # Validate language code against supported languages.
+#             if request.language.lower() not in supported_languages:
+#                 raise HTTPException(status_code=400,
+#                                     detail="Language code sent is either unsupported or misspelled.")
 
-            speaker_wav = XTTS.get_speaker_wav(request.speaker_wav)
-            language = request.language[0:2]
+#             speaker_wav = XTTS.get_speaker_wav(request.speaker_wav)
+#             language = request.language[0:2]
 
-            if stream.is_playing() and not STREAM_PLAY_SYNC:
-                stream.stop()
-                stream = TextToAudioStream(engine)
+#             if stream.is_playing() and not STREAM_PLAY_SYNC:
+#                 stream.stop()
+#                 stream = TextToAudioStream(engine)
 
-            engine.set_voice(speaker_wav)
-            engine.language = request.language.lower()
+#             engine.set_voice(speaker_wav)
+#             engine.language = request.language.lower()
            
-            # Start streaming, works only on your local computer.
-            stream.feed(request.text)
-            play_stream(stream,language)
+#             # Start streaming, works only on your local computer.
+#             stream.feed(request.text)
+#             play_stream(stream,language)
 
-            # It's a hack, just send 1 second of silence so that there is no sillyTavern error.
-            this_dir = Path(__file__).parent.resolve()
-            output = this_dir / "RealtimeTTS" / "silence.wav"
+#             # It's a hack, just send 1 second of silence so that there is no sillyTavern error.
+#             this_dir = Path(__file__).parent.resolve()
+#             output = this_dir / "RealtimeTTS" / "silence.wav"
 
-            return FileResponse(
-                path=output,
-                media_type='audio/wav',
-                filename="silence.wav",
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    else:
-        try:
-            if XTTS.model_source == "local":
-              logger.info(f"Processing TTS to audio with request: {request}")
+#             return FileResponse(
+#                 path=output,
+#                 media_type='audio/wav',
+#                 filename="silence.wav",
+#             )
+#         except Exception as e:
+#             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+#     else:
+#         try:
+#             if XTTS.model_source == "local":
+#               logger.info(f"Processing TTS to audio with request: {request}")
 
-            # Validate language code against supported languages.
-            if request.language.lower() not in supported_languages:
-                raise HTTPException(status_code=400,
-                                    detail="Language code sent is either unsupported or misspelled.")
+#             # Validate language code against supported languages.
+#             if request.language.lower() not in supported_languages:
+#                 raise HTTPException(status_code=400,
+#                                     detail="Language code sent is either unsupported or misspelled.")
 
-            # Generate an audio file using process_tts_to_file.
-            output_file_path = XTTS.process_tts_to_file(
-                text=request.text,
-                speaker_name_or_path=request.speaker_wav,
-                language=request.language.lower(),
-                file_name_or_path=request.save_path
-            )
+#             # Generate an audio file using process_tts_to_file.
+#             output_file_path = XTTS.process_tts_to_file(
+#                 text=request.text,
+#                 speaker_name_or_path=request.speaker_wav,
+#                 language=request.language.lower(),
+#                 file_name_or_path=request.save_path
+#             )
 
-            # Return the file in the response
-            return FileResponse(
-                path=output_file_path,
-                media_type='audio/wav',
-                filename="output.wav",
-                )
+#             # Return the file in the response
+#             return FileResponse(
+#                 path=output_file_path,
+#                 media_type='audio/wav',
+#                 filename="output.wav",
+#                 )
 
-        except Exception as e:
-            logger.error(e)
-            raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+#         except Exception as e:
+#             logger.error(e)
+#             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-@app.post("/tts_to_file")
-async def tts_to_file(request: SynthesisFileRequest):
-    try:
-        if XTTS.model_source == "local":
-          logger.info(f"Processing TTS to file with request: {request}")
+# @app.post("/tts_to_file")
+# async def tts_to_file(request: SynthesisFileRequest):
+#     try:
+#         if XTTS.model_source == "local":
+#           logger.info(f"Processing TTS to file with request: {request}")
 
-        # Validate language code against supported languages.
-        if request.language.lower() not in supported_languages:
-             raise HTTPException(status_code=400,
-                                 detail="Language code sent is either unsupported or misspelled.")
+#         # Validate language code against supported languages.
+#         if request.language.lower() not in supported_languages:
+#              raise HTTPException(status_code=400,
+#                                  detail="Language code sent is either unsupported or misspelled.")
 
-        # Now use process_tts_to_file for saving the file.
-        output_file = XTTS.process_tts_to_file(
-            text=request.text,
-            speaker_name_or_path=request.speaker_wav,
-            language=request.language.lower(),
-            file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
-        )
-        return {"message": "The audio was successfully made and stored.", "output_path": output_file}
+#         # Now use process_tts_to_file for saving the file.
+#         output_file = XTTS.process_tts_to_file(
+#             text=request.text,
+#             speaker_name_or_path=request.speaker_wav,
+#             language=request.language.lower(),
+#             file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
+#         )
+#         return {"message": "The audio was successfully made and stored.", "output_path": output_file}
 
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+#     except Exception as e:
+#         logger.error(e)
+#         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app,host="0.0.0.0",port=8020)
