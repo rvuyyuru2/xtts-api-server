@@ -7,20 +7,20 @@ LABEL description="Docker image for xtts-api-server_v1"
 # Install required packages (avoid cache to reduce image size)
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-    python3-dev portaudio19-dev python3-venv libportaudio2 libasound2-dev libportaudiocpp0 \
+    python3-dev portaudio19-dev  libportaudio2 libasound2-dev libportaudiocpp0 \
     git python3 python3-pip make g++ ffmpeg && \
     rm -rf /var/lib/apt/lists/*
-
+# apt-get install python3-venv
 # Upgrade pip and install virtualenv
 RUN python3 -m pip install --upgrade pip setuptools wheel ninja virtualenv
 
 # Create a virtual environment and activate it
-RUN python3 -m venv venv
-ENV PATH="/app/venv/bin:$PATH"
+# RUN python3 -m venv venv
+# ENV PATH="/app/venv/bin:$PATH"
 
 # Copy the application source code to /app directory and change the workdir to /app
-COPY .. /app
-WORKDIR /app
+# COPY .. /app
+# WORKDIR /app
 
 
 
