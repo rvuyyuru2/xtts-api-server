@@ -227,6 +227,7 @@ def set_tts_settings_endpoint(tts_settings_req: TTSSettingsRequest):
 
 @app.get('/tts_stream')
 async def tts_stream(request: TTSStreamRequest):
+    print(request)
     # Validate local model source.
     if XTTS.model_source != "local":
         raise HTTPException(status_code=400,
