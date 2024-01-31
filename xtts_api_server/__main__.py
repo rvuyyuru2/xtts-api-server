@@ -4,7 +4,7 @@ import os
 
 parser = ArgumentParser(description="Run the Uvicorn server.")
 parser.add_argument("-hs", "--host", default="localhost", help="Host to bind")
-parser.add_argument("-p", "--port", default=8080, type=int, help="Port to bind")
+parser.add_argument("-p", "--port", default=8020, type=int, help="Port to bind")
 parser.add_argument("-d", "--device", default="cuda", type=str, help="Device that will be used, you can choose cpu or cuda")
 parser.add_argument("-sf", "--speaker-folder", default="speakers/", type=str, help="The folder where you get the samples for tts")
 parser.add_argument("-o", "--output", default="output/", type=str, help="Output folder")
