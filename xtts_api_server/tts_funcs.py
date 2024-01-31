@@ -546,131 +546,129 @@ class TTSWrapper:
                 raise ValueError(f"Speaker {speaker_name_or_path} not found.")
 
         return speaker_wav
-
-
-    # MAIN FUNC
-    # def process_tts_to_file(self, text, speaker_name_or_path, language, file_name_or_path="out.wav", stream=False):
-        # if file_name_or_path == '' or file_name_or_path is None:
-        #     file_name_or_path = "out.wav"  
-        # try:
-        #     # Check speaker_name_or_path in models_folder and speakers_folder
-        #     if speaker_name_or_path:
-        #         speaker_path_models_folder = Path(self.model_folder) / speaker_name_or_path
-        #         speaker_path_speakers_folder = Path(self.speaker_folder) / speaker_name_or_path
-        #         speaker_path_speakers_file = speaker_path_speakers_folder.with_suffix('.wav')
-                
-        #         # Check if the .wav file exists or if the directory exists for the speaker
-        #         if speaker_path_speakers_folder.is_dir() or speaker_path_speakers_file.exists():
-        #             speaker_wav = self.get_speaker_wav(speaker_name_or_path)
-        #         elif speaker_path_models_folder.is_dir():
-        #             reference_wav = speaker_path_models_folder / "reference.wav"
-        #             if reference_wav.exists():
-        #                 speaker_wav = str(reference_wav)
-        #             else:
-        #                 logger.info(f"No 'reference.wav' found in {speaker_path_models_folder}")
-        #         else:
-        #             raise ValueError(f"Speaker path '{speaker_name_or_path}' not found in speakers or models folder.")
-        #     # Determine output path based on whether a full path or a file name was provided
-        #     if os.path.isabs(file_name_or_path):
-        #         # An absolute path was provided by user; use as is.
-        #         output_file = file_name_or_path
-        #     else:
-        #         # Only a filename was provided; prepend with output folder.
-        #         output_file = os.path.join(self.output_folder, file_name_or_path)
-
-
-        #     # Check if 'text' is a valid path to a '.txt' file.
-        #     if os.path.isfile(text) and text.lower().endswith('.txt'):
-        #         with open(text, 'r', encoding='utf-8') as f:
-        #             text = f.read()
-
-        #     # Generate unic name for cached result
-        #     if self.enable_cache_results:
-        #         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        #         file_name_or_path = timestamp + "_cache_" + file_name_or_path
-        #         output_file = os.path.join(self.output_folder, file_name_or_path)
-
-        #     # Replace double quotes with single, asterisks, carriage returns, and line feeds
-        #     clear_text = self.clean_text(text)
-
-        #     # Generate a dictionary of the parameters to use for caching.
-        #     text_params = {
-        #       'text': clear_text,
-        #       'speaker_name_or_path': speaker_name_or_path,
-        #       'language': language,
-        #       'file_name_or_path': file_name_or_path
-        #     }
-
-        #     # Check if results are already cached.
-        #     cached_result = self.check_cache(text_params)
-
-        #     if cached_result is not None:
-        #         logger.info("Using cached result.")
-        #         return cached_result  # Return the path to the cached result.
-
-        #     self.switch_model_device() # Load to CUDA if lowram ON
-
-        #     # Define generation if model via api or locally
-        #     if self.model_source == "local":
-        #         if stream:
-        #             async def stream_fn():
-        #                 async for chunk in self.stream_generation(clear_text,speaker_name_or_path,speaker_wav,language,output_file):
-        #                     yield chunk
-        #                 self.switch_model_device()
-        #                 # After generation completes successfully...
-        #                 self.update_cache(text_params,output_file)
-        #             return stream_fn()
-        #         else:
-        #             self.local_generation(clear_text,speaker_name_or_path,speaker_wav,language,output_file)
-        #     else:
-        #         self.api_generation(clear_text,speaker_wav,language,output_file)
-            
-        #     self.switch_model_device() # Unload to CPU if lowram ON
-
-        #     # After generation completes successfully...
-        #     self.update_cache(text_params,output_file)
-        #     return output_file
-
-        # except Exception as e:
-        #     raise e  # Propagate exceptions for endpoint handling.
-
-
-
-
-def determine_output_file(self, base_output_folder, extension=".wav"):
-    """Generate a unique file name using UUID and ensure it doesn't already exist."""
-    while True:
+    
+    def determine_output_file(self, base_output_folder, extension=".wav"):
+     """Generate a unique file name using UUID and ensure it doesn't already exist."""
+     while True:
         unique_filename = str(uuid.uuid4()) + extension
         output_file = Path(base_output_folder) / unique_filename
         if not output_file.exists():
             return output_file
-
-def process_tts_to_file(self, text, speaker_name_or_path, language, stream=False):
-    try:
-        speaker_wav = self.validate_speaker_path(speaker_name_or_path)
-        output_file = self.determine_output_file(self.output_folder)  # Use the new function to determine output file
-        text = self.read_text_if_file(text)
-        clear_text = self.clean_text(text)
-        text_params = self.generate_text_params(clear_text, speaker_name_or_path, language, str(output_file))
-
-        if cached_result := self.check_cache(text_params):
-            logger.info("Using cached result.")
-            return cached_result
-
-        self.switch_model_device()  # Prepare model device
-        result = self.generate_tts(clear_text, speaker_wav, language, output_file, stream)
-        self.switch_model_device()  # Reset model device
-
-        self.update_cache(text_params, output_file)  # Update cache
-        return result
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise
-    except IOError as e:
-        logger.error(f"I/O error: {e}")
-        raise
-    # Handle other specific exceptions as necessary
-
-
-
         
+    # def process_tts_to_file(self, text, speaker_name_or_path, language, stream=False):
+    #     try:
+    #         speaker_wav = self.validate_speaker_path(speaker_name_or_path)
+    #         output_file = self.determine_output_file(self.output_folder)  # Use the new function to determine output file
+    #         text = self.read_text_if_file(text)
+    #         clear_text = self.clean_text(text)
+    #         text_params = self.generate_text_params(clear_text, speaker_name_or_path, language, str(output_file))
+
+    #         if cached_result := self.check_cache(text_params):
+    #             logger.info("Using cached result.")
+    #             return cached_result
+
+    #         self.switch_model_device()  # Prepare model device
+    #         result = self.generate_tts(clear_text, speaker_wav, language, output_file, stream)
+    #         self.switch_model_device()  # Reset model device
+
+    #         self.update_cache(text_params, output_file)  # Update cache
+    #         return result
+    #     except ValueError as e:
+    #         logger.error(f"Validation error: {e}")
+    #         raise
+    #     except IOError as e:
+    #         logger.error(f"I/O error: {e}")
+    #         raise
+            
+    # Handle other specific exceptions as necessary
+    
+    
+
+
+    # MAIN FUNC
+    def process_tts_to_file(self, text, speaker_name_or_path, language, file_name_or_path="out.wav", stream=False):
+        if file_name_or_path == '' or file_name_or_path is None:
+            file_name_or_path = self.determine_output_file(self.output_folder) 
+        try:
+            # Check speaker_name_or_path in models_folder and speakers_folder
+            if speaker_name_or_path:
+                speaker_path_models_folder = Path(self.model_folder) / speaker_name_or_path
+                speaker_path_speakers_folder = Path(self.speaker_folder) / speaker_name_or_path
+                speaker_path_speakers_file = speaker_path_speakers_folder.with_suffix('.wav')
+                
+                # Check if the .wav file exists or if the directory exists for the speaker
+                if speaker_path_speakers_folder.is_dir() or speaker_path_speakers_file.exists():
+                    speaker_wav = self.get_speaker_wav(speaker_name_or_path)
+                elif speaker_path_models_folder.is_dir():
+                    reference_wav = speaker_path_models_folder / "reference.wav"
+                    if reference_wav.exists():
+                        speaker_wav = str(reference_wav)
+                    else:
+                        logger.info(f"No 'reference.wav' found in {speaker_path_models_folder}")
+                else:
+                    raise ValueError(f"Speaker path '{speaker_name_or_path}' not found in speakers or models folder.")
+            # Determine output path based on whether a full path or a file name was provided
+            if os.path.isabs(file_name_or_path):
+                # An absolute path was provided by user; use as is.
+                output_file = file_name_or_path
+            else:
+                # Only a filename was provided; prepend with output folder.
+                output_file = os.path.join(self.output_folder, file_name_or_path)
+
+
+            # Check if 'text' is a valid path to a '.txt' file.
+            if os.path.isfile(text) and text.lower().endswith('.txt'):
+                with open(text, 'r', encoding='utf-8') as f:
+                    text = f.read()
+
+            # Generate unic name for cached result
+            if self.enable_cache_results:
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                file_name_or_path = timestamp + "_cache_" + file_name_or_path
+                output_file = os.path.join(self.output_folder, file_name_or_path)
+
+            # Replace double quotes with single, asterisks, carriage returns, and line feeds
+            clear_text = self.clean_text(text)
+            logger.info("clean text",clear_text)
+            # Generate a dictionary of the parameters to use for caching.
+            text_params = {
+              'text': clear_text,
+              'speaker_name_or_path': speaker_name_or_path,
+              'language': language,
+              'file_name_or_path': file_name_or_path
+            }
+
+            # Check if results are already cached.
+            cached_result = self.check_cache(text_params)
+
+            if cached_result is not None:
+                logger.info("Using cached result.")
+                return cached_result  # Return the path to the cached result.
+
+            self.switch_model_device() # Load to CUDA if lowram ON
+
+            # Define generation if model via api or locally
+            if self.model_source == "local":
+                if stream:
+                    async def stream_fn():
+                        async for chunk in self.stream_generation(clear_text,speaker_name_or_path,speaker_wav,language,output_file):
+                            yield chunk
+                        self.switch_model_device()
+                        # After generation completes successfully...
+                        self.update_cache(text_params,output_file)
+                    return stream_fn()
+                else:
+                    self.local_generation(clear_text,speaker_name_or_path,speaker_wav,language,output_file)
+            else:
+                self.api_generation(clear_text,speaker_wav,language,output_file)
+            
+            self.switch_model_device() # Unload to CPU if lowram ON
+
+            # After generation completes successfully...
+            self.update_cache(text_params,output_file)
+            return output_file
+
+        except Exception as e:
+        #     raise e  # Propagate exceptions for endpoint handling.
+
+
