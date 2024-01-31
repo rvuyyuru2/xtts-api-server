@@ -546,7 +546,7 @@ class TTSWrapper:
 
 
     # MAIN FUNC
-    def process_tts_to_file(self, text, speaker_name_or_path, language, file_name_or_path="out.wav", stream=False):
+    # def process_tts_to_file(self, text, speaker_name_or_path, language, file_name_or_path="out.wav", stream=False):
         if file_name_or_path == '' or file_name_or_path is None:
             file_name_or_path = "out.wav"  
         try:
@@ -631,6 +631,44 @@ class TTSWrapper:
         except Exception as e:
             raise e  # Propagate exceptions for endpoint handling.
 
+
+import os
+from pathlib import Path
+import uuid
+
+def determine_output_file(self, base_output_folder, extension=".wav"):
+    """Generate a unique file name using UUID and ensure it doesn't already exist."""
+    while True:
+        unique_filename = str(uuid.uuid4()) + extension
+        output_file = Path(base_output_folder) / unique_filename
+        if not output_file.exists():
+            return output_file
+
+def process_tts_to_file(self, text, speaker_name_or_path, language, stream=False):
+    try:
+        speaker_wav = self.validate_speaker_path(speaker_name_or_path)
+        output_file = self.determine_output_file(self.output_folder)  # Use the new function to determine output file
+        text = self.read_text_if_file(text)
+        clear_text = self.clean_text(text)
+        text_params = self.generate_text_params(clear_text, speaker_name_or_path, language, str(output_file))
+
+        if cached_result := self.check_cache(text_params):
+            logger.info("Using cached result.")
+            return cached_result
+
+        self.switch_model_device()  # Prepare model device
+        result = self.generate_tts(clear_text, speaker_wav, language, output_file, stream)
+        self.switch_model_device()  # Reset model device
+
+        self.update_cache(text_params, output_file)  # Update cache
+        return result
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise
+    except IOError as e:
+        logger.error(f"I/O error: {e}")
+        raise
+    # Handle other specific exceptions as necessary
 
 
 
