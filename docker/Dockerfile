@@ -15,7 +15,7 @@ RUN apt-get update && \
 RUN python3 -m pip install --upgrade pip setuptools wheel ninja virtualenv
 
 # Create a virtual environment and activate it
-RUN python -m venv venv
+RUN python3 -m venv venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Copy the application source code to /app directory and change the workdir to /app
