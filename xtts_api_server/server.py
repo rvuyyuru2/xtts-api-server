@@ -253,7 +253,7 @@ async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Q
                 text=text,
                 speaker_name_or_path=speaker_wav,
                 language=language.lower(),
-                stream=True  # Ensure this function is designed to work in streaming mode.
+                stream=False  # Ensure this function is designed to work in streaming mode.
             )
             
             # Yield the WAV file header first.
