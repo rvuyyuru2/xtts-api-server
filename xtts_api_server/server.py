@@ -1,3 +1,4 @@
+from typing import AsyncGenerator
 from TTS.api import TTS
 from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,27 +8,12 @@ from pydantic import BaseModel
 import uvicorn
 
 import os
+import time
 from pathlib import Path
+import shutil
 from loguru import logger
 from argparse import ArgumentParser
 from pathlib import Path
-import base64
-import io
-import os
-import tempfile
-import wave
-import torch
-import numpy as np
-from typing import List
-from pydantic import BaseModel
-
-from fastapi import FastAPI, UploadFile, Body
-from fastapi.responses import StreamingResponse
-
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import Xtts
-from TTS.utils.generic_utils import get_user_data_dir
-from TTS.utils.manage import ModelManager
 
 from xtts_api_server.tts_funcs import TTSWrapper,supported_languages,InvalidSettingsError
 from xtts_api_server.RealtimeTTS import TextToAudioStream, CoquiEngine
@@ -38,10 +24,10 @@ DEVICE = os.getenv('DEVICE',"cuda")
 OUTPUT_FOLDER = os.getenv('OUTPUT', 'output')
 SPEAKER_FOLDER = os.getenv('SPEAKER', 'speakers')
 MODEL_FOLDER = os.getenv('MODEL', 'models')
-BASE_HOST = os.getenv('BASE_URL', '127.0.0.1:8080')
-BASE_URL = os.getenv('BASE_URL', '127.0.0.1:8080')
+BASE_HOST = os.getenv('BASE_URL', '127.0.0.1:8020')
+BASE_URL = os.getenv('BASE_URL', '127.0.0.1:8020')
 MODEL_SOURCE = os.getenv("MODEL_SOURCE", "local")
-MODEL_VERSION = os.getenv("MODEL_VERSION","v2.0.3")
+MODEL_VERSION = os.getenv("MODEL_VERSION","v2.0.2")
 LOWVRAM_MODE = os.getenv("LOWVRAM_MODE") == 'true'
 DEEPSPEED = os.getenv("DEEPSPEED") == 'true'
 USE_CACHE = os.getenv("USE_CACHE") == 'true'
@@ -56,7 +42,6 @@ if(DEEPSPEED):
 
 # Create an instance of the TTSWrapper class and server
 app = FastAPI()
-print("started")
 XTTS = TTSWrapper(OUTPUT_FOLDER,SPEAKER_FOLDER,MODEL_FOLDER,LOWVRAM_MODE,MODEL_SOURCE,MODEL_VERSION,DEVICE,DEEPSPEED,USE_CACHE)
 
 # Check for old format model version
@@ -156,176 +141,6 @@ class SynthesisFileRequest(BaseModel):
     language: str
     file_name_or_path: str  
 
-
-
-
-torch.set_num_threads(int(os.environ.get("NUM_THREADS", os.cpu_count())))
-device = torch.device("cuda" if os.environ.get("USE_CPU", "0") == "0" else "cpu")
-if not torch.cuda.is_available() and device == "cuda":
-    raise RuntimeError("CUDA device unavailable, please use Dockerfile.cpu instead.") 
-
-custom_model_path = os.environ.get("CUSTOM_MODEL_PATH", "/app/tts_models")
-
-if os.path.exists(custom_model_path) and os.path.isfile(custom_model_path + "/config.json"):
-    model_path = custom_model_path
-    print("Loading custom model from", model_path, flush=True)
-else:
-    print("Loading default model", flush=True)
-    model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
-    print("Downloading XTTS Model:", model_name, flush=True)
-    ModelManager().download_model(model_name)
-    model_path = os.path.join(get_user_data_dir("tts"), model_name.replace("/", "--"))
-    print("XTTS Model downloaded", flush=True)
-
-print("Loading XTTS", flush=True)
-config = XttsConfig()
-config.load_json(os.path.join(model_path, "config.json"))
-model = Xtts.init_from_config(config)
-model.load_checkpoint(config, checkpoint_dir=model_path, eval=True, use_deepspeed=True if device == "cuda" else False)
-model.to(device)
-print("XTTS Loaded.", flush=True)
-
-print("Running XTTS Server ...", flush=True)
-
-##### Run fastapi #####
-app = FastAPI(
-    title="XTTS Streaming server",
-    description="""XTTS Streaming server""",
-    version="0.0.1",
-    docs_url="/",
-)
-
-
-@app.post("/clone_speaker")
-def predict_speaker(wav_file: UploadFile):
-    """Compute conditioning inputs from reference audio file."""
-    temp_audio_name = next(tempfile._get_candidate_names())
-    with open(temp_audio_name, "wb") as temp, torch.inference_mode():
-        temp.write(io.BytesIO(wav_file.file.read()).getbuffer())
-        gpt_cond_latent, speaker_embedding = model.get_conditioning_latents(
-            temp_audio_name
-        )
-    return {
-        "gpt_cond_latent": gpt_cond_latent.cpu().squeeze().half().tolist(),
-        "speaker_embedding": speaker_embedding.cpu().squeeze().half().tolist(),
-    }
-
-
-def postprocess(wav):
-    """Post process the output waveform"""
-    if isinstance(wav, list):
-        wav = torch.cat(wav, dim=0)
-    wav = wav.clone().detach().cpu().numpy()
-    wav = wav[None, : int(wav.shape[0])]
-    wav = np.clip(wav, -1, 1)
-    wav = (wav * 32767).astype(np.int16)
-    return wav
-
-
-def encode_audio_common(
-    frame_input, encode_base64=True, sample_rate=24000, sample_width=2, channels=1
-):
-    """Return base64 encoded audio"""
-    wav_buf = io.BytesIO()
-    with wave.open(wav_buf, "wb") as vfout:
-        vfout.setnchannels(channels)
-        vfout.setsampwidth(sample_width)
-        vfout.setframerate(sample_rate)
-        vfout.writeframes(frame_input)
-
-    wav_buf.seek(0)
-    if encode_base64:
-        b64_encoded = base64.b64encode(wav_buf.getbuffer()).decode("utf-8")
-        return b64_encoded
-    else:
-        return wav_buf.read()
-
-
-class StreamingInputs(BaseModel):
-    speaker_embedding: List[float]
-    gpt_cond_latent: List[List[float]]
-    text: str
-    language: str
-    add_wav_header: bool = True
-    stream_chunk_size: str = "40"
-
-
-def predict_streaming_generator(parsed_input: dict = Body(...)):
-    speaker_embedding = torch.tensor(parsed_input.speaker_embedding).unsqueeze(0).unsqueeze(-1)
-    gpt_cond_latent = torch.tensor(parsed_input.gpt_cond_latent).reshape((-1, 1024)).unsqueeze(0)
-    text = parsed_input.text
-    language = parsed_input.language
-
-    stream_chunk_size = int(parsed_input.stream_chunk_size)
-    add_wav_header = parsed_input.add_wav_header
-
-
-    chunks = model.inference_stream(
-        text,
-        language,
-        gpt_cond_latent,
-        speaker_embedding,
-        stream_chunk_size=stream_chunk_size,
-        enable_text_splitting=True
-    )
-
-    for i, chunk in enumerate(chunks):
-        chunk = postprocess(chunk)
-        if i == 0 and add_wav_header:
-            yield encode_audio_common(b"", encode_base64=False)
-            yield chunk.tobytes()
-        else:
-            yield chunk.tobytes()
-
-
-@app.post("/tts_stream")
-def predict_streaming_endpoint(parsed_input: StreamingInputs):
-    return StreamingResponse(
-        predict_streaming_generator(parsed_input),
-        media_type="audio/wav",
-    )
-
-class TTSInputs(BaseModel):
-    speaker_embedding: List[float]
-    gpt_cond_latent: List[List[float]]
-    text: str
-    language: str
-
-@app.post("/tts")
-def predict_speech(parsed_input: TTSInputs):
-    speaker_embedding = torch.tensor(parsed_input.speaker_embedding).unsqueeze(0).unsqueeze(-1)
-    gpt_cond_latent = torch.tensor(parsed_input.gpt_cond_latent).reshape((-1, 1024)).unsqueeze(0)
-    text = parsed_input.text
-    language = parsed_input.language
-
-    out = model.inference(
-        text,
-        language,
-        gpt_cond_latent,
-        speaker_embedding,
-    )
-
-    wav = postprocess(torch.tensor(out["wav"]))
-
-    return encode_audio_common(wav.tobytes())
-
-
-@app.get("/studio_speakers")
-def get_speakers():
-    if hasattr(model, "speaker_manager") and hasattr(model.speaker_manager, "speakers"):
-        return {
-            speaker: {
-                "speaker_embedding": model.speaker_manager.speakers[speaker]["speaker_embedding"].cpu().squeeze().half().tolist(),
-                "gpt_cond_latent": model.speaker_manager.speakers[speaker]["gpt_cond_latent"].cpu().squeeze().half().tolist(),
-            }
-            for speaker in model.speaker_manager.speakers.keys()
-        }
-    else:
-        return {}
-        
-@app.get("/languages")
-def get_languages():
-    return config.languages
 @app.get("/speakers_list")
 def get_speakers():
     speakers = XTTS.get_speakers()
@@ -402,121 +217,164 @@ def set_tts_settings_endpoint(tts_settings_req: TTSSettingsRequest):
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get('/tts_stream')
-async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Query(), language: str = Query()):
-    # Validate local model source.
-    if XTTS.model_source != "local":
-        raise HTTPException(status_code=400,
-                            detail="HTTP Streaming is only supported for local models.")
-    # Validate language code against supported languages.
-    if language.lower() not in supported_languages:
-        raise HTTPException(status_code=400,
-                            detail="Language code sent is either unsupported or misspelled.")
+# @app.get('/tts_stream')
+# async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Query(), language: str = Query()):
+#     # Validate local model source.
+#     if XTTS.model_source != "local":
+#         raise HTTPException(status_code=400,
+#                             detail="HTTP Streaming is only supported for local models.")
+#     # Validate language code against supported languages.
+#     if language.lower() not in supported_languages:
+#         raise HTTPException(status_code=400,
+#                             detail="Language code sent is either unsupported or misspelled.")
             
-    async def generator():
-        chunks = XTTS.process_tts_to_file(
-            text=text,
-            speaker_name_or_path=speaker_wav,
-            language=language.lower(),
-            stream=True,
-        )
-        # Write file header to the output stream.
-        yield XTTS.get_wav_header()
-        async for chunk in chunks:
-            # Check if the client is still connected.
-            disconnected = await request.is_disconnected()
-            if disconnected:
-                break
-            yield chunk
+#     async def generator():
+#         chunks = XTTS.process_tts_to_file(
+#             text=text,
+#             speaker_name_or_path=speaker_wav,
+#             language=language.lower(),
+#             stream=True,
+#         )
+#         # Write file header to the output stream.
+#         yield XTTS.get_wav_header()
+#         async for chunk in chunks:
+#             # Check if the client is still connected.
+#             disconnected = await request.is_disconnected()
+#             if disconnected:
+#                 break
+#             yield chunk
 
+#     return StreamingResponse(generator(), media_type='audio/x-wav')
+
+@app.get('/tts_stream')
+async def tts_stream(request: Request, text: str = Query(...), speaker_wav: str = Query(...), language: str = Query(...)) -> StreamingResponse:
+    """
+    Stream TTS-generated audio as a WAV file in response to HTTP GET requests.
+    """
+    # Validate that the model source is local.
+    if XTTS.model_source != "local":
+        raise HTTPException(status_code=400, detail="HTTP Streaming is only supported for local models.")
+    
+    # Validate the provided language code.
+    if language.lower() not in supported_languages:
+        raise HTTPException(status_code=400, detail="The provided language code is either unsupported or misspelled.")
+    
+    async def generator() -> AsyncGenerator[bytes, None]:
+        """
+        An asynchronous generator that yields audio chunks for streaming, with exception handling.
+        """
+        try:
+            # Process TTS to generate audio chunks.
+            chunks = XTTS.process_tts_to_file(
+                text=text,
+                speaker_name_or_path=speaker_wav,
+                language=language.lower(),
+                stream=True  # Ensure this function is designed to work in streaming mode.
+            )
+            
+            # Yield the WAV file header first.
+            yield XTTS.get_wav_header()
+            
+            # Iterate over the generated audio chunks.
+            async for chunk in chunks:
+                # Check if the client has disconnected.
+                if await request.is_disconnected():
+                    print("Client disconnected, stopping stream.")
+                    break  # Stop the generator if the client is disconnected.
+                yield chunk
+        except Exception as e:
+            # Handle exceptions that might occur during TTS processing or streaming.
+            print(f"An error occurred during TTS streaming: {e}")
+            # You might choose to log the error, send it to a monitoring service, or take other appropriate actions.
+
+    # Return a streaming response with the generator and set the appropriate media type for WAV audio.
     return StreamingResponse(generator(), media_type='audio/x-wav')
+# @app.post("/tts_to_audio/")
+# async def tts_to_audio(request: SynthesisRequest):
+#     if STREAM_MODE or STREAM_MODE_IMPROVE:
+#         try:
+#             global stream
+#             # Validate language code against supported languages.
+#             if request.language.lower() not in supported_languages:
+#                 raise HTTPException(status_code=400,
+#                                     detail="Language code sent is either unsupported or misspelled.")
 
-@app.post("/tts_to_audio/")
-async def tts_to_audio(request: SynthesisRequest):
-    if STREAM_MODE or STREAM_MODE_IMPROVE:
-        try:
-            global stream
-            # Validate language code against supported languages.
-            if request.language.lower() not in supported_languages:
-                raise HTTPException(status_code=400,
-                                    detail="Language code sent is either unsupported or misspelled.")
+#             speaker_wav = XTTS.get_speaker_wav(request.speaker_wav)
+#             language = request.language[0:2]
 
-            speaker_wav = XTTS.get_speaker_wav(request.speaker_wav)
-            language = request.language[0:2]
+#             if stream.is_playing() and not STREAM_PLAY_SYNC:
+#                 stream.stop()
+#                 stream = TextToAudioStream(engine)
 
-            if stream.is_playing() and not STREAM_PLAY_SYNC:
-                stream.stop()
-                stream = TextToAudioStream(engine)
-
-            engine.set_voice(speaker_wav)
-            engine.language = request.language.lower()
+#             engine.set_voice(speaker_wav)
+#             engine.language = request.language.lower()
            
-            # Start streaming, works only on your local computer.
-            stream.feed(request.text)
-            play_stream(stream,language)
+#             # Start streaming, works only on your local computer.
+#             stream.feed(request.text)
+#             play_stream(stream,language)
 
-            # It's a hack, just send 1 second of silence so that there is no sillyTavern error.
-            this_dir = Path(__file__).parent.resolve()
-            output = this_dir / "RealtimeTTS" / "silence.wav"
+#             # It's a hack, just send 1 second of silence so that there is no sillyTavern error.
+#             this_dir = Path(__file__).parent.resolve()
+#             output = this_dir / "RealtimeTTS" / "silence.wav"
 
-            return FileResponse(
-                path=output,
-                media_type='audio/wav',
-                filename="silence.wav",
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-    else:
-        try:
-            if XTTS.model_source == "local":
-              logger.info(f"Processing TTS to audio with request: {request}")
+#             return FileResponse(
+#                 path=output,
+#                 media_type='audio/wav',
+#                 filename="silence.wav",
+#             )
+#         except Exception as e:
+#             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+#     else:
+#         try:
+#             if XTTS.model_source == "local":
+#               logger.info(f"Processing TTS to audio with request: {request}")
 
-            # Validate language code against supported languages.
-            if request.language.lower() not in supported_languages:
-                raise HTTPException(status_code=400,
-                                    detail="Language code sent is either unsupported or misspelled.")
+#             # Validate language code against supported languages.
+#             if request.language.lower() not in supported_languages:
+#                 raise HTTPException(status_code=400,
+#                                     detail="Language code sent is either unsupported or misspelled.")
 
-            # Generate an audio file using process_tts_to_file.
-            output_file_path = XTTS.process_tts_to_file(
-                text=request.text,
-                speaker_name_or_path=request.speaker_wav,
-                language=request.language.lower()
-            )
+#             # Generate an audio file using process_tts_to_file.
+#             output_file_path = XTTS.process_tts_to_file(
+#                 text=request.text,
+#                 speaker_name_or_path=request.speaker_wav,
+#                 language=request.language.lower()
+#             )
 
-            # Return the file in the response
-            return FileResponse(
-                path=output_file_path,
-                media_type='audio/wav',
-                filename="output.wav",
-                )
+#             # Return the file in the response
+#             return FileResponse(
+#                 path=output_file_path,
+#                 media_type='audio/wav',
+#                 filename="output.wav",
+#                 )
 
-        except Exception as e:
-            logger.error(e)
-            raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+#         except Exception as e:
+#             logger.error(e)
+#             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-@app.post("/tts_to_file")
-async def tts_to_file(request: SynthesisFileRequest):
-    try:
-        if XTTS.model_source == "local":
-          logger.info(f"Processing TTS to file with request: {request}")
+# @app.post("/tts_to_file")
+# async def tts_to_file(request: SynthesisFileRequest):
+#     try:
+#         if XTTS.model_source == "local":
+#           logger.info(f"Processing TTS to file with request: {request}")
 
-        # Validate language code against supported languages.
-        if request.language.lower() not in supported_languages:
-             raise HTTPException(status_code=400,
-                                 detail="Language code sent is either unsupported or misspelled.")
+#         # Validate language code against supported languages.
+#         if request.language.lower() not in supported_languages:
+#              raise HTTPException(status_code=400,
+#                                  detail="Language code sent is either unsupported or misspelled.")
 
-        # Now use process_tts_to_file for saving the file.
-        output_file = XTTS.process_tts_to_file(
-            text=request.text,
-            speaker_name_or_path=request.speaker_wav,
-            language=request.language.lower(),
-            file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
-        )
-        return {"message": "The audio was successfully made and stored.", "output_path": output_file}
+#         # Now use process_tts_to_file for saving the file.
+#         output_file = XTTS.process_tts_to_file(
+#             text=request.text,
+#             speaker_name_or_path=request.speaker_wav,
+#             language=request.language.lower(),
+#             file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
+#         )
+#         return {"message": "The audio was successfully made and stored.", "output_path": output_file}
 
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+#     except Exception as e:
+#         logger.error(e)
+#         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    uvicorn.run(app,host="0.0.0.0",port=8080)
+    uvicorn.run(app,host="0.0.0.0",port=8002)
