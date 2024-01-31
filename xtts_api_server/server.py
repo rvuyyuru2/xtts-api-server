@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse,StreamingResponse
 
 from pydantic import BaseModel
 import uvicorn
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 import os
 import time
@@ -149,6 +149,12 @@ class TTSStreamRequest(BaseModel):
     language: str
     save_path: Optional[str] = None
 
+class SynthesisRequest(BaseModel):
+    text: str
+    speaker_wav: str 
+    language: str
+
+
 @app.get("/speakers_list")
 def get_speakers():
     speakers = XTTS.get_speakers()
@@ -224,36 +230,81 @@ def set_tts_settings_endpoint(tts_settings_req: TTSSettingsRequest):
     except InvalidSettingsError as e: 
         logger.error(e)
         raise HTTPException(status_code=400, detail=str(e))
+    
 
 @app.get('/tts_stream')
-async def tts_stream(request: TTSStreamRequest):
-    print(request)
-    # Validate local model source.
+async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Query(), language: str = Query()):
+    """
+    Stream TTS-generated audio as a WAV file in response to HTTP GET requests.
+    """
+    # Validate that the model source is local.
     if XTTS.model_source != "local":
-        raise HTTPException(status_code=400,
-                            detail="HTTP Streaming is only supported for local models.")
-    # Validate language code against supported languages.
-    if request.language.lower() not in supported_languages:
-        raise HTTPException(status_code=400,
-                            detail="Language code sent is either unsupported or misspelled.")
+        raise HTTPException(status_code=400, detail="HTTP Streaming is only supported for local models.")
+    
+    # Validate the provided language code.
+    if language.lower() not in supported_languages:
+        raise HTTPException(status_code=400, detail="The provided language code is either unsupported or misspelled.")
+    
+    async def generator() -> AsyncGenerator[bytes, None]:
+        """
+        An asynchronous generator that yields audio chunks for streaming, with exception handling.
+        """
+        try:
+            # Process TTS to generate audio chunks.
+            chunks = XTTS.process_tts_to_file(
+                text=text,
+                speaker_name_or_path=speaker_wav,
+                language=language.lower(),
+                stream=True  # Ensure this function is designed to work in streaming mode.
+            )
             
-    async def generator():
-        chunks = XTTS.process_tts_to_file(
-            text=request.text,
-            speaker_name_or_path=request.speaker_wav,
-            language=request.language.lower(),
-            stream=True,
-        )
-        # Write file header to the output stream.
-        yield XTTS.get_wav_header()
-        async for chunk in chunks:
-            # Check if the client is still connected.
-            disconnected = await request.is_disconnected()
-            if disconnected:
-                break
-            yield chunk
+            # Yield the WAV file header first.
+            yield XTTS.get_wav_header()
+            
+            # Iterate over the generated audio chunks.
+            async for chunk in chunks:
+                # Check if the client has disconnected.
+                if await request.is_disconnected():
+                    print("Client disconnected, stopping stream.")
+                    break  # Stop the generator if the client is disconnected.
+                yield chunk
+        except Exception as e:
+            # Handle exceptions that might occur during TTS processing or streaming.
+            print(f"An error occurred during TTS streaming: {e}")
+            # You might choose to log the error, send it to a monitoring service, or take other appropriate actions.
 
-    return StreamingResponse(generator(), media_type='audio/x-wav')
+    # Return a streaming response with the generator and set the appropriate media type for WAV audio.
+    return StreamingResponse(generator(), media_type='audio/x-wav')    
+
+# @app.get('/tts_stream')
+# async def tts_stream(request: TTSStreamRequest):
+#     print(request)
+#     # Validate local model source.
+#     if XTTS.model_source != "local":
+#         raise HTTPException(status_code=400,
+#                             detail="HTTP Streaming is only supported for local models.")
+#     # Validate language code against supported languages.
+#     if request.language.lower() not in supported_languages:
+#         raise HTTPException(status_code=400,
+#                             detail="Language code sent is either unsupported or misspelled.")
+            
+#     async def generator():
+#         chunks = XTTS.process_tts_to_file(
+#             text=request.text,
+#             speaker_name_or_path=request.speaker_wav,
+#             language=request.language.lower(),
+#             stream=True,
+#         )
+#         # Write file header to the output stream.
+#         yield XTTS.get_wav_header()
+#         async for chunk in chunks:
+#             # Check if the client is still connected.
+#             disconnected = await request.is_disconnected()
+#             if disconnected:
+#                 break
+#             yield chunk
+
+#     return StreamingResponse(generator(), media_type='audio/x-wav')
 
 @app.post("/tts_to_audio/")
 async def tts_to_audio(request: SynthesisRequest):
