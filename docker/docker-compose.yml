@@ -19,7 +19,7 @@ services:
     restart: always
     build:
       context: ..
-      dockerfile: ./Dockerfile
+      dockerfile: ./docker/Dockerfile
     ports:
       - "${HOST_PORT:-8020}:${CONTAINER_PORT:-8020}"
     volumes:
