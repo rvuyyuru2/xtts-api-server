@@ -132,7 +132,7 @@ class SynthesisRequest(BaseModel):
     text: str
     speaker_wav: Optional[str] = None
     language: str
-    save_path: Optional[str] = None
+    # save_path: Optional[str] = None
 
 class SynthesisFileRequest(BaseModel):
     text: str
