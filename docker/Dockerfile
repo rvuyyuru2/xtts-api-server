@@ -1,5 +1,5 @@
 # Use an official NVIDIA base image with CUDA support
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu18.04
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
 # Set label for the docker image description
 LABEL description="Docker image for xtts-api-server_v1"
