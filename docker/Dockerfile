@@ -23,16 +23,16 @@ RUN python3 -m venv venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Copy the application source code to /app directory and change the workdir to /app
-COPY .. /app
-WORKDIR /app
+# COPY .. /app
+# WORKDIR /app
 
 
 
 # Install Python dependencies
 RUN pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 RUN pip install deepspeed
-RUN pip install -r requirements.txt
-# RUN pip install xtts-api-server
+# RUN pip install -r requirements.txt
+RUN pip install xtts-api-server
 
 # Expose the container ports
 EXPOSE 8020
