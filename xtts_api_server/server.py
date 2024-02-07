@@ -368,29 +368,29 @@ async def tts_stream(request: Request, text: str = Query(), speaker_wav: str = Q
 #             logger.error(e)
 #             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-# @app.post("/tts_to_file")
-# async def tts_to_file(request: SynthesisFileRequest):
-#     try:
-#         if XTTS.model_source == "local":
-#           logger.info(f"Processing TTS to file with request: {request}")
+@app.post("/tts_to_file")
+async def tts_to_file(request: SynthesisFileRequest):
+    try:
+        if XTTS.model_source == "local":
+          logger.info(f"Processing TTS to file with request: {request}")
 
-#         # Validate language code against supported languages.
-#         if request.language.lower() not in supported_languages:
-#              raise HTTPException(status_code=400,
-#                                  detail="Language code sent is either unsupported or misspelled.")
+        # Validate language code against supported languages.
+        if request.language.lower() not in supported_languages:
+             raise HTTPException(status_code=400,
+                                 detail="Language code sent is either unsupported or misspelled.")
 
-#         # Now use process_tts_to_file for saving the file.
-#         output_file = XTTS.process_tts_to_file(
-#             text=request.text,
-#             speaker_name_or_path=request.speaker_wav,
-#             language=request.language.lower(),
-#             file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
-#         )
-#         return {"message": "The audio was successfully made and stored.", "output_path": output_file}
+        # Now use process_tts_to_file for saving the file.
+        output_file = XTTS.process_tts_to_file(
+            text=request.text,
+            speaker_name_or_path=request.speaker_wav,
+            language=request.language.lower(),
+            file_name_or_path=request.file_name_or_path  # The user-provided path to save the file is used here.
+        )
+        return {"message": "The audio was successfully made and stored.", "output_path": output_file}
 
-#     except Exception as e:
-#         logger.error(e)
-#         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    except Exception as e:
+        logger.error(e)
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app,host="0.0.0.0",port=8020)

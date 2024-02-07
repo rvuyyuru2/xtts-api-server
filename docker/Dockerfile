@@ -12,7 +12,7 @@ RUN apt update && apt install -y tcl
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
     python3-dev portaudio19-dev python3-venv  libportaudio2 libasound2-dev libportaudiocpp0 \
-    git python3 python3-pip make g++ ffmpeg && \
+    git python3.9 python3-pip make g++ ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 # apt-get install python3-venv
 # Upgrade pip and install virtualenv

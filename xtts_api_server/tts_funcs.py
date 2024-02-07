@@ -628,8 +628,8 @@ class TTSWrapper:
                 output_file = os.path.join(self.output_folder, file_name_or_path)
 
             # Replace double quotes with single, asterisks, carriage returns, and line feeds
-            clear_text = self.clean_text(text)
-            logger.info("clean text",clear_text)
+            clear_text = text
+            # logger.info("clean text",clear_text)
             # Generate a dictionary of the parameters to use for caching.
             text_params = {
               'text': clear_text,
