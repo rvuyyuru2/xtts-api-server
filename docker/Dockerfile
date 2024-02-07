@@ -4,7 +4,7 @@ FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 # Set label for the docker image description
 LABEL description="Docker image for xtts-api-server_v1"
 # Set the working directory
-ARG DEBIAN_FRONTEND = noninteractive
+ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt update && apt install -y tcl
 
